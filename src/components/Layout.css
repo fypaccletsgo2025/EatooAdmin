@@ -1,21 +1,23 @@
 .admin-container {
   min-height: 100vh;
   display: flex;
-  background: linear-gradient(135deg, #fff8f1 0%, #f5f6fb 45%, #fefefe 100%);
+  background: var(--brand-background, #fff5ed);
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
     "Helvetica Neue", Arial, sans-serif;
+  color: var(--brand-text, #1f2937);
 }
 
 .sidebar {
-  width: 270px;
-  background-color: #0f172a;
-  color: #f8fafc;
+  width: 286px;
+  background: #1f2937;
+  color: #fff;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   padding: 32px 28px;
   gap: 32px;
-  box-shadow: 0 25px 55px rgba(15, 23, 42, 0.45);
+  box-shadow: 0 25px 45px rgba(31, 41, 55, 0.45);
+  border-right: 1px solid rgba(255, 227, 198, 0.2);
 }
 
 .sidebar-top {
@@ -32,28 +34,29 @@
 }
 
 .brand-mark {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #fb923c, #f97316);
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ff4d00, #fdaa48);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   color: #fff;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
 }
 
 .brand-name {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   font-weight: 600;
+  color: #fff;
 }
 
 .brand-subtitle {
   margin: 4px 0 0;
   font-size: 0.85rem;
-  color: #cbd5f5;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .nav-links {
@@ -64,9 +67,9 @@
 }
 
 .nav-link {
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 12px 16px;
-  color: #cbd5f5;
+  color: rgba(255, 255, 255, 0.72);
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -77,14 +80,15 @@
 }
 
 .nav-link:hover {
-  background: rgba(248, 250, 252, 0.08);
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
   transform: translateX(2px);
 }
 
 .nav-link.active {
-  background: rgba(249, 115, 22, 0.2);
+  background: rgba(255, 77, 0, 0.22);
   color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 227, 198, 0.45);
 }
 
 .nav-indicator {
@@ -94,10 +98,10 @@
 
 .sidebar-footer {
   padding: 20px;
-  border-radius: 16px;
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(4px);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
 }
 
 .sidebar-tip-title {
@@ -105,19 +109,19 @@
   font-size: 0.9rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #fbbf24;
+  color: #fdaa48;
 }
 
 .sidebar-tip-copy {
   margin: 0;
-  color: #e2e8f0;
+  color: rgba(255, 255, 255, 0.78);
   line-height: 1.4;
 }
 
 .main-content {
   flex: 1;
-  background-color: transparent;
-  padding: 40px 48px;
+  background: var(--brand-background, #fff5ed);
+  padding: 52px 64px;
 }
 
 .main-surface {
@@ -174,15 +178,15 @@
   align-items: center;
   justify-content: center;
   padding: 32px 16px;
-  background: linear-gradient(135deg, #0f172a, #1e293b);
+  background: radial-gradient(circle at top, rgba(255, 77, 0, 0.3), rgba(31, 41, 55, 0.95));
 }
 
 .auth-card {
   width: min(420px, 100%);
   background: #fff;
-  border-radius: 20px;
+  border-radius: 24px;
   padding: 32px;
-  box-shadow: 0 35px 70px rgba(15, 23, 42, 0.35);
+  box-shadow: 0 35px 70px rgba(31, 41, 55, 0.35);
 }
 
 .auth-form {
@@ -197,12 +201,12 @@
   flex-direction: column;
   gap: 8px;
   font-weight: 500;
-  color: #0f172a;
+  color: #1f2937;
 }
 
 .auth-form input {
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--brand-divider, #ffe3c6);
   font-size: 1rem;
 }

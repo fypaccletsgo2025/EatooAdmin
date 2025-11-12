@@ -1,12 +1,36 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { callAdminApi, fetchAdminData, ADMIN_API_READY } from "../lib/adminApi";
 
+const EMPTY_FORM = {
+  name: "",
+  businessName: "",
+  registrationNo: "",
+  cuisine: "",
+  city: "",
+  state: "",
+  postcode: "",
+  address: "",
+  contact: "",
+  phone: "",
+  email: "",
+  website: "",
+  note: "",
+  ownerId: "",
+};
+
 const filterByQuery = (items, query, cuisine) => {
   const term = query.trim().toLowerCase();
   return items.filter((item) => {
     const matchesCuisine = cuisine === "all" || (item.cuisine || "").toLowerCase() === cuisine;
     if (!term) return matchesCuisine;
-    const haystack = [item.name, item.location, item.cuisine, item.contact]
+    const haystack = [
+      item.name,
+      item.city,
+      item.state,
+      item.cuisine,
+      item.contact,
+      item.email,
+    ]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
@@ -24,23 +48,25 @@ export default function UserSubmissions() {
   const [cuisineFilter, setCuisineFilter] = useState("all");
   const [processing, setProcessing] = useState(null);
 
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [formData, setFormData] = useState({ ...EMPTY_FORM });
+
   const loadSubs = useCallback(async () => {
     setLoading(true);
     setError(null);
     if (!ADMIN_API_READY) {
-      setError(
-        "Admin API base URL missing. Set VITE_ADMIN_API_BASE_URL in your .env file and restart the dev server."
-      );
+      setError("Missing API base URL. Check your .env file.");
       setLoading(false);
       return;
     }
+
     try {
       const data = await fetchAdminData("/user-submissions");
       setPendingSubs(data.pending || []);
       setContactedSubs(data.contacted || []);
     } catch (err) {
-      console.error("Failed to load submissions", err);
-      setError("Unable to fetch user submissions. Try reloading.");
+      console.error(err);
+      setError("Failed to load submissions. Try refreshing.");
     } finally {
       setLoading(false);
     }
@@ -58,35 +84,27 @@ export default function UserSubmissions() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [pendingSubs, contactedSubs]);
 
-  const visiblePending = useMemo(() => filterByQuery(pendingSubs, search, cuisineFilter), [
-    pendingSubs,
-    search,
-    cuisineFilter,
-  ]);
+  const visiblePending = useMemo(
+    () => filterByQuery(pendingSubs, search, cuisineFilter),
+    [pendingSubs, search, cuisineFilter]
+  );
+
   const visibleContacted = useMemo(
     () => filterByQuery(contactedSubs, search, cuisineFilter),
     [contactedSubs, search, cuisineFilter]
   );
 
-  const callBackend = async (action, sub, path, extraData) => {
+  const callBackend = async (action, sub, path, extraData = {}) => {
     setProcessing({ id: sub.$id, type: action });
-    setBanner(null);
     setError(null);
-
-    if (!ADMIN_API_READY) {
-      setError(
-        "Admin API base URL missing. Set VITE_ADMIN_API_BASE_URL in your .env file and restart the dev server."
-      );
-      setProcessing(null);
-      return;
-    }
+    setBanner(null);
 
     try {
       const data = await callAdminApi(path, { documentId: sub.$id, ...extraData });
-      setBanner(data.message || "Submission updated.");
+      setBanner(data.message || "Updated successfully.");
       loadSubs();
     } catch (err) {
-      console.error(`Failed to ${action} submission`, err);
+      console.error(err);
       setError(err.message);
     } finally {
       setProcessing(null);
@@ -95,159 +113,369 @@ export default function UserSubmissions() {
 
   const handleContactOwner = (sub) =>
     callBackend("contact", sub, "/contact-user-submission");
-  const handleApprove = (sub) =>
-    callBackend("approve", sub, "/approve-user-submission");
+
   const handleReject = (sub) => {
-    const reason = window.prompt("Enter rejection reason");
+    const reason = window.prompt("Enter rejection reason:");
     if (!reason) return;
     callBackend("reject", sub, "/reject-user-submission", { reason });
   };
 
-  const renderSubmission = (sub, canContact = false) => {
+  const handleApproveToggle = (sub) => {
+    if (selectedSubmission?.$id === sub.$id) {
+      setSelectedSubmission(null);
+      setFormData({ ...EMPTY_FORM });
+      return;
+    }
+
+    setSelectedSubmission(sub);
+    setFormData({
+      name: sub.name || "",
+      businessName: sub.businessName || sub.name || "",
+      registrationNo: sub.registrationNo || "",
+      cuisine: sub.cuisine || "",
+      city: sub.city || sub.location || "",
+      state: sub.state || "",
+      postcode: sub.postcode || "",
+      address: sub.address || "",
+      contact: sub.contact || "",
+      phone: sub.phone || "",
+      email: sub.email || "",
+      website: sub.website || "",
+      note: sub.note || "",
+      ownerId: sub.ownerId || sub.$id || "",
+    });
+  };
+
+  const handleConfirmApprove = async () => {
+    if (!selectedSubmission) return;
+    const base = (import.meta.env.VITE_ADMIN_API_BASE_URL || "").trim().replace(/\/$/, "");
+    if (!base) {
+      setError("Missing admin API base URL.");
+      return;
+    }
+
+    try {
+      setProcessing({ id: selectedSubmission.$id, type: "approve" });
+      setBanner(null);
+      const response = await fetch(`${base}/approve-user-submission`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentId: selectedSubmission.$id,
+          overrides: formData,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result?.message || "Approval failed.");
+
+      setBanner(result.message || `${formData.name} approved and added.`);
+      setSelectedSubmission(null);
+      setFormData({ ...EMPTY_FORM });
+      loadSubs();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Approval failed.");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const renderSubmission = (sub, canContact) => {
     const isProcessing = processing?.id === sub.$id;
     const isContacting = isProcessing && processing?.type === "contact";
-    const isApproving = isProcessing && processing?.type === "approve";
     const isRejecting = isProcessing && processing?.type === "reject";
+    const isApproving = isProcessing && processing?.type === "approve";
+    const isSelected = selectedSubmission?.$id === sub.$id;
 
     return (
-      <article key={sub.$id} className="list-card">
-        <div className="list-card-content">
-          <div className="list-card-header">
-            <h3>{sub.name}</h3>
-            <span
-              className={`status-pill ${
-                canContact ? "status-pill--pending" : "status-pill--info"
-              }`}
-            >
-              {canContact ? "Pending outreach" : "Contacted"}
-            </span>
+      <React.Fragment key={sub.$id}>
+        <article className="list-card">
+          <div className="list-card-content">
+            <div className="list-card-header">
+              <h3>{sub.name || "Unnamed Restaurant"}</h3>
+              <span
+                className={`status-pill ${
+                  canContact ? "status-pill--pending" : "status-pill--info"
+                }`}
+              >
+                {canContact ? "Pending outreach" : "Contacted"}
+              </span>
+            </div>
+            <p>{sub.cuisine || "Cuisine unknown"}</p>
+            <div className="list-meta">
+              <span>{sub.city || "City unknown"}</span>
+              {sub.contact && <span>{sub.contact}</span>}
+              <span>Added {new Date(sub.$createdAt).toLocaleDateString()}</span>
+            </div>
+            {sub.note && <p className="list-note">Note: {sub.note}</p>}
           </div>
-          <p>{sub.cuisine || "Cuisine unknown"}</p>
-          <div className="list-meta">
-            <span>{sub.location || "Location unavailable"}</span>
-            {sub.contact && <span>{sub.contact}</span>}
-            <span>Added {new Date(sub.$createdAt).toLocaleDateString()}</span>
-          </div>
-          {sub.note && <p className="list-note">User note: {sub.note}</p>}
-        </div>
-        <div className="list-card-actions">
-          {canContact && (
+
+          <div className="list-card-actions">
+            {canContact ? (
+              <button
+                className="btn btn-secondary"
+                onClick={() => handleContactOwner(sub)}
+                disabled={isProcessing}
+              >
+                {isContacting ? "Updating..." : "Contact"}
+              </button>
+            ) : (
+              <button
+                className="btn btn-primary"
+                onClick={() => handleApproveToggle(sub)}
+                disabled={isProcessing}
+              >
+                {isSelected ? (isApproving ? "Approving..." : "Close") : "Approve"}
+              </button>
+            )}
             <button
-              className="btn btn-secondary"
-              onClick={() => handleContactOwner(sub)}
+              className="btn btn-danger"
+              onClick={() => handleReject(sub)}
               disabled={isProcessing}
             >
-              {isContacting ? "Updating..." : "Contact owner"}
+              {isRejecting ? "Rejecting..." : "Reject"}
             </button>
-          )}
-          <button
-            className="btn btn-primary"
-            onClick={() => handleApprove(sub)}
-            disabled={isProcessing}
-          >
-            {isApproving ? "Approving..." : "Approve"}
-          </button>
-          <button
-            className="btn btn-danger"
-            onClick={() => handleReject(sub)}
-            disabled={isProcessing}
-          >
-            {isRejecting ? "Rejecting..." : "Reject"}
-          </button>
-        </div>
-      </article>
+          </div>
+        </article>
+
+        {isSelected && (
+          <div className="approve-panel">
+            <div className="approve-panel-header">
+              <div>
+                <p className="eyebrow">Quick approve</p>
+                <h3>Finalize {formData.name || sub.name}</h3>
+              </div>
+              <button className="btn btn-ghost" type="button" onClick={() => handleApproveToggle(sub)}>
+                Close
+              </button>
+            </div>
+            <form
+              className="approve-panel-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleConfirmApprove();
+              }}
+            >
+              <label>
+                <span>Restaurant name *</span>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </label>
+              <div className="approve-panel-grid">
+                <label>
+                  <span>Registration number</span>
+                  <input
+                    type="text"
+                    value={formData.registrationNo}
+                    onChange={(e) => setFormData({ ...formData, registrationNo: e.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>Cuisine</span>
+                  <input
+                    type="text"
+                    value={formData.cuisine}
+                    onChange={(e) => setFormData({ ...formData, cuisine: e.target.value })}
+                  />
+                </label>
+              </div>
+              <div className="approve-panel-grid">
+                <label>
+                  <span>City</span>
+                  <input
+                    type="text"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>State</span>
+                  <input
+                    type="text"
+                    value={formData.state}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>Postcode</span>
+                  <input
+                    type="text"
+                    value={formData.postcode}
+                    onChange={(e) => setFormData({ ...formData, postcode: e.target.value })}
+                  />
+                </label>
+              </div>
+              <label>
+                <span>Address</span>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                />
+              </label>
+              <div className="approve-panel-grid">
+                <label>
+                  <span>Primary contact</span>
+                  <input
+                    type="text"
+                    value={formData.contact}
+                    onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>Phone</span>
+                  <input
+                    type="text"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>Email</span>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>Website</span>
+                  <input
+                    type="url"
+                    value={formData.website}
+                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                  />
+                </label>
+              </div>
+              <label>
+                <span>Owner ID</span>
+                <input
+                  type="text"
+                  value={formData.ownerId}
+                  onChange={(e) => setFormData({ ...formData, ownerId: e.target.value })}
+                />
+              </label>
+              <label>
+                <span>Internal note</span>
+                <textarea
+                  rows={3}
+                  value={formData.note}
+                  onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                />
+              </label>
+              <div className="modal-actions">
+                <button type="submit" className="btn btn-primary" disabled={isApproving}>
+                  {isApproving ? "Approving..." : "Confirm approve"}
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => handleApproveToggle(sub)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </React.Fragment>
     );
   };
 
   return (
-    <div className="page">
-      <div className="page-header">
-        <div>
-          <p className="eyebrow">Community leads</p>
-          <h1>User submissions</h1>
-          <p className="page-description">
-            Each submission is a high-intent suggestion from diners. Contact them, capture more context, and
-            graduate the best into the live catalog.
-          </p>
-        </div>
-        <div className="page-actions">
-          <button className="btn btn-ghost" onClick={loadSubs} disabled={loading}>
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
-      </div>
-
-      {banner && <div className="inline-alert inline-alert--success">{banner}</div>}
-      {error && <div className="inline-alert inline-alert--error">{error}</div>}
-
-      <div className="filter-row">
-        <label className="field-control">
-          <span className="field-label">Search</span>
-          <input
-            type="search"
-            className="field-input"
-            placeholder="Restaurant, city, contact"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
-        <label className="field-control">
-          <span className="field-label">Cuisine</span>
-          <select
-            className="field-input"
-            value={cuisineFilter}
-            onChange={(e) => setCuisineFilter(e.target.value)}
-          >
-            <option value="all">All cuisines</option>
-            {cuisines.map((cuisine) => (
-              <option key={cuisine} value={cuisine.toLowerCase()}>
-                {cuisine}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <section className="panel">
-        <div className="panel-header">
+    <>
+      <div className="page">
+        <div className="page-header">
           <div>
-            <h2 className="panel-title">Pending submissions</h2>
-            <p className="panel-description">
-              {visiblePending.length} of {pendingSubs.length} leads awaiting first touch
+            <p className="eyebrow">Community leads</p>
+            <h1>User submissions</h1>
+            <p className="page-description">
+              Compare community tips, keep outreach organized, and add worthy restaurants in minutes.
             </p>
           </div>
-        </div>
-        <div className="panel-body">
-          {loading && <p className="loading-indicator">Loading submissions...</p>}
-          {!loading && visiblePending.length === 0 && (
-            <div className="empty-state">
-              <strong>No pending submissions found</strong>
-              Community leads will show up here as soon as they come in.
-            </div>
-          )}
-          {visiblePending.map((sub) => renderSubmission(sub, true))}
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="panel-header">
-          <div>
-            <h2 className="panel-title">Contacted leads</h2>
-            <p className="panel-description">
-              Keep an eye on who is ready to be approved once paperwork lands.
-            </p>
+          <div className="page-actions">
+            <button className="btn btn-ghost" onClick={loadSubs} disabled={loading}>
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
           </div>
         </div>
-        <div className="panel-body">
-          {!loading && visibleContacted.length === 0 && (
-            <div className="empty-state">
-              <strong>No contacted leads yet</strong>
-              Move submissions into this view once you have reached out.
-            </div>
-          )}
-          {visibleContacted.map((sub) => renderSubmission(sub, false))}
+
+        {banner && <div className="inline-alert inline-alert--success">{banner}</div>}
+        {error && <div className="inline-alert inline-alert--error">{error}</div>}
+
+        <div className="filter-row">
+          <label className="field-control">
+            <span className="field-label">Search</span>
+            <input
+              type="search"
+              className="field-input"
+              placeholder="Name, cuisine, city, contact"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          <label className="field-control">
+            <span className="field-label">Cuisine</span>
+            <select
+              className="field-input"
+              value={cuisineFilter}
+              onChange={(e) => setCuisineFilter(e.target.value)}
+            >
+              <option value="all">All cuisines</option>
+              {cuisines.map((cuisine) => (
+                <option key={cuisine} value={cuisine.toLowerCase()}>
+                  {cuisine}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-      </section>
-    </div>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2 className="panel-title">Pending submissions</h2>
+              <p className="panel-description">
+                {visiblePending.length} of {pendingSubs.length} leads awaiting outreach
+              </p>
+            </div>
+          </div>
+          <div className="panel-body">
+            {loading && <p className="loading-indicator">Loading submissions...</p>}
+            {!loading && visiblePending.length === 0 && (
+              <div className="empty-state">
+                <strong>No pending leads match your filters</strong>
+                Adjust search or check back later.
+              </div>
+            )}
+            {visiblePending.map((sub) => renderSubmission(sub, true))}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2 className="panel-title">Contacted leads</h2>
+              <p className="panel-description">
+                {visibleContacted.length} of {contactedSubs.length} ready for approval
+              </p>
+            </div>
+          </div>
+          <div className="panel-body">
+            {loading && contactedSubs.length === 0 && (
+              <p className="loading-indicator">Loading contacted submissions...</p>
+            )}
+            {!loading && visibleContacted.length === 0 && (
+              <div className="empty-state">
+                <strong>No contacted leads yet</strong>
+                Mark a submission as contacted once you've spoken with them.
+              </div>
+            )}
+            {visibleContacted.map((sub) => renderSubmission(sub, false))}
+          </div>
+        </section>
+      </div>
+    </>
   );
 }

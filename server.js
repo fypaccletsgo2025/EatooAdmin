@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import "dotenv/config";
-import { Client, Databases, Query } from "node-appwrite";
+import { Client, Databases, ID, Query } from "node-appwrite";
 
 const app = express();
 app.use(cors());
@@ -135,24 +135,35 @@ app.post("/contact-user-submission", async (req, res) => {
 
 app.post("/approve-user-submission", async (req, res) => {
   try {
-    const { documentId } = req.body;
+    const { documentId, overrides } = req.body;
     const submission = await db.getDocument(DB_ID, COL_USER_SUBMISSIONS, documentId);
 
+    const name = overrides?.name || submission.name;
+    if (!name) {
+      throw new Error("Missing restaurant name.");
+    }
+
     const restaurantDoc = await db.createDocument(DB_ID, COL_RESTAURANTS, documentId, {
-      name: submission.name,
-      location: submission.location,
-      cuisine: submission.cuisine,
-      contact: submission.contact || "",
+      name,
+      cuisine: overrides?.cuisine || submission.cuisine,
+      city: overrides?.city || submission.city || submission.location || "",
+      state: overrides?.state || submission.state || "",
+      address: overrides?.address || submission.address || "",
+      contact: overrides?.contact || submission.contact || "",
+      phone: overrides?.phone || submission.phone || "",
+      email: overrides?.email || submission.email || "",
+      website: overrides?.website || submission.website || "",
       note: submission.note || "",
       status: "live",
       type: "user",
+      ownerId: submission.ownerId || submission.$id,
     });
 
     await db.deleteDocument(DB_ID, COL_USER_SUBMISSIONS, documentId);
 
     res.json({
       ok: true,
-      message: `${submission.name} moved to live restaurants.`,
+      message: `${name} moved to live restaurants.`,
       restaurant: restaurantDoc,
     });
   } catch (err) {
@@ -175,30 +186,37 @@ app.post("/reject-user-submission", async (req, res) => {
 
 app.post("/approve-restaurant-request", async (req, res) => {
   try {
-    const { documentId } = req.body;
+    const { documentId, overrides = {} } = req.body;
     const request = await db.getDocument(DB_ID, COL_REQUESTS, documentId);
 
-    const restaurantDoc = await db.createDocument(DB_ID, COL_RESTAURANTS, documentId, {
-      businessName: request.businessName,
-      registrationNo: request.registrationNo,
-      email: request.email,
-      phone: request.phone,
-      address: request.address,
-      city: request.city,
-      state: request.state,
-      postcode: request.postcode,
-      cuisine: request.cuisine,
-      website: request.website || "",
-      note: request.note || "",
+    const name = overrides.name || request.businessName || request.name;
+    if (!name) {
+      throw new Error("Missing restaurant name.");
+    }
+
+    const restaurantDoc = await db.createDocument(DB_ID, COL_RESTAURANTS, ID.unique(), {
+      name,
+      businessName: overrides.businessName || request.businessName || name,
+      registrationNo: overrides.registrationNo || request.registrationNo || "",
+      email: overrides.email || request.email || "",
+      phone: overrides.phone || request.phone || "",
+      address: overrides.address || request.address || "",
+      city: overrides.city || request.city || "",
+      state: overrides.state || request.state || "",
+      postcode: overrides.postcode || request.postcode || "",
+      cuisine: overrides.cuisine || request.cuisine || "",
+      website: overrides.website || request.website || "",
+      note: overrides.note || request.note || "",
       status: "live",
       type: "owner",
+      ownerId: overrides.ownerId || request.ownerId || request.$id || ID.unique(),
     });
 
     await db.deleteDocument(DB_ID, COL_REQUESTS, documentId);
 
     res.json({
       ok: true,
-      message: `${request.businessName} approved and moved to live restaurants.`,
+      message: `${name} approved and moved to live restaurants.`,
       restaurant: restaurantDoc,
     });
   } catch (err) {
