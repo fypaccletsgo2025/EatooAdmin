@@ -1,19 +1,27 @@
 import React from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import "./Layout.css";
+import AdminAccess from "./AdminAccess";
+import { useAuth } from "../context/AuthContext";
 
 const navItems = [
   { to: "/", label: "Dashboard", end: true },
-  { to: "/pending", label: "Pending Restaurants" },
-  { to: "/submissions", label: "User Submissions" },
-  { to: "/manage-restaurants", label: "Manage Restaurants" },
+  { to: "/restaurant-requests", label: "Owner Requests" },
+  { to: "/user-submissions", label: "User Submissions" },
+  { to: "/manage-restaurants", label: "Restaurants" },
 ];
 
 export default function Layout() {
+  const { isAdmin, logout } = useAuth();
+
+  if (!isAdmin) {
+    return <AdminAccess />;
+  }
+
   return (
     <div className="admin-container">
       <aside className="sidebar">
-        <div>
+        <div className="sidebar-top">
           <div className="brand">
             <div className="brand-mark">EA</div>
             <div>
@@ -38,6 +46,9 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
+          <button className="btn btn-ghost" onClick={logout}>
+            Sign out
+          </button>
         </div>
         <div className="sidebar-footer">
           <p className="sidebar-tip-title">Daily tip</p>

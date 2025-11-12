@@ -1,127 +1,191 @@
-import React, { useEffect, useState } from "react";
-import { db, DB_ID } from "../appwrite";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { callAdminApi, fetchAdminData, ADMIN_API_READY } from "../lib/adminApi";
+
+const formatLocation = (doc) => {
+  if (doc.location) return doc.location;
+  const parts = [doc.address, doc.city, doc.state];
+  return parts.filter(Boolean).join(", ") || "Location unavailable";
+};
 
 export default function ManageRestaurants() {
-  const [restaurants, setRestaurants] = useState([]);
+  const [live, setLive] = useState([]);
+  const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [banner, setBanner] = useState(null);
+  const [search, setSearch] = useState("");
+  const [processing, setProcessing] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function fetchRestaurants() {
-      try {
-        const res = await db.listDocuments(DB_ID, "restaurants");
-        if (!isMounted) return;
-        setRestaurants(res.documents);
-        setError(null);
-      } catch (err) {
-        console.error("Failed to load restaurants", err);
-        if (isMounted) {
-          setError("Unable to load restaurants right now.");
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchRestaurants();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this restaurant?")) {
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    if (!ADMIN_API_READY) {
+      setError(
+        "Admin API base URL missing. Set VITE_ADMIN_API_BASE_URL in .env and restart the dev server."
+      );
+      setLoading(false);
       return;
     }
-
     try {
-      await db.deleteDocument(DB_ID, "restaurants", id);
-      setRestaurants((prev) => prev.filter((r) => r.$id !== id));
-      setError(null);
+      const data = await fetchAdminData("/manage-restaurants");
+      setLive(data.live || []);
+      setPending(data.contacted || []);
     } catch (err) {
-      console.error("Failed to delete restaurant", err);
-      setError("Unable to delete the restaurant. Please try again.");
+      console.error("Failed to load restaurants", err);
+      setError("Unable to fetch restaurants. Try again later.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const filteredLive = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return live;
+    return live.filter((item) => {
+      const haystack = [item.name, item.cuisine, formatLocation(item)]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [live, search]);
+
+  const handleRemove = async (restaurant) => {
+    const reason = window.prompt("Reason for removal?");
+    if (!reason) return;
+    setProcessing(restaurant.$id);
+    setBanner(null);
+    setError(null);
+    try {
+      await callAdminApi("/remove-restaurant", {
+        documentId: restaurant.$id,
+        reason,
+      });
+      setBanner(`${restaurant.name} removed from the catalog.`);
+      loadData();
+    } catch (err) {
+      console.error("Failed to remove restaurant", err);
+      setError("Removal failed. Please try again.");
+    } finally {
+      setProcessing(null);
     }
   };
 
   return (
-    <section className="page">
-      <header className="page-header">
+    <div className="page">
+      <div className="page-header">
         <div>
           <p className="eyebrow">Catalog</p>
-          <h1>Manage Restaurants</h1>
+          <h1>Manage restaurants</h1>
           <p className="page-description">
-            Quickly audit live restaurants and remove listings that are no
-            longer available.
+            Quickly search, audit, or remove restaurants. Keep the list tidy so diners always have a
+            great experience.
           </p>
         </div>
-      </header>
+        <div className="page-actions">
+          <button className="btn btn-ghost" onClick={loadData} disabled={loading}>
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
+      </div>
 
-      <div className="panel">
+      {banner && <div className="inline-alert inline-alert--success">{banner}</div>}
+      {error && <div className="inline-alert inline-alert--error">{error}</div>}
+
+      <div className="filter-row">
+        <label className="field-control">
+          <span className="field-label">Search</span>
+          <input
+            className="field-input"
+            type="search"
+            placeholder="Name, cuisine, city"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+      </div>
+
+      <section className="panel">
         <div className="panel-header">
           <div>
-            <h2 className="panel-title">Live partners</h2>
+            <h2 className="panel-title">Live restaurants</h2>
             <p className="panel-description">
-              {loading
-                ? "Loading restaurants..."
-                : `${restaurants.length} restaurant${
-                    restaurants.length === 1 ? "" : "s"
-                  } currently live`}
+              {filteredLive.length} of {live.length} partners visible
             </p>
           </div>
         </div>
         <div className="panel-body">
-          {error && <p className="error-text">{error}</p>}
-
-          {loading && (
+          {loading && <p className="loading-indicator">Loading live restaurants...</p>}
+          {!loading && filteredLive.length === 0 && (
             <div className="empty-state">
-              <strong>Loading restaurants</strong>
-              This might take just a moment.
+              <strong>No restaurants match your search</strong>
+              Try a different keyword or clear the search box.
             </div>
           )}
-
-          {!loading && restaurants.length === 0 && (
-            <div className="empty-state">
-              <strong>No restaurants yet</strong>
-              Approve pending partners to grow your catalog.
-            </div>
-          )}
-
-          {!loading && restaurants.length > 0 && (
-            <div className="data-list">
-              {restaurants.map((restaurant) => (
-                <article key={restaurant.$id} className="list-card">
-                  <div className="list-card-content">
-                    <h3>{restaurant.name || "Untitled restaurant"}</h3>
-                    <p>{restaurant.location || "Location not provided"}</p>
-                    <div className="list-meta">
-                      {restaurant.cuisine && (
-                        <span>{restaurant.cuisine}</span>
-                      )}
-                      {restaurant.status && (
-                        <span>Status: {restaurant.status}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="list-card-actions">
-                    <button
-                      className="btn btn-danger"
-                      onClick={() => handleDelete(restaurant.$id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
+          {filteredLive.map((restaurant) => (
+            <article key={restaurant.$id} className="list-card">
+              <div className="list-card-content">
+                <div className="list-card-header">
+                  <h3>{restaurant.name}</h3>
+                  <span className="status-pill status-pill--success">Live</span>
+                </div>
+                <p>{restaurant.cuisine || "Cuisine missing"}</p>
+                <div className="list-meta">
+                  <span>{formatLocation(restaurant)}</span>
+                  {restaurant.contact && <span>{restaurant.contact}</span>}
+                </div>
+              </div>
+              <div className="list-card-actions">
+                <button
+                  className="btn btn-danger"
+                  onClick={() => handleRemove(restaurant)}
+                  disabled={processing === restaurant.$id}
+                >
+                  {processing === restaurant.$id ? "Removing..." : "Remove"}
+                </button>
+              </div>
+            </article>
+          ))}
         </div>
-      </div>
-    </section>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2 className="panel-title">Contacted submissions</h2>
+            <p className="panel-description">
+              Leads awaiting final approval once paperwork is complete.
+            </p>
+          </div>
+        </div>
+        <div className="panel-body">
+          {!loading && pending.length === 0 && (
+            <div className="empty-state">
+              <strong>No contacted submissions</strong>
+              Move user submissions here after outreach so you can activate them later.
+            </div>
+          )}
+          {pending.map((sub) => (
+            <article key={sub.$id} className="list-card">
+              <div className="list-card-content">
+                <div className="list-card-header">
+                  <h3>{sub.name}</h3>
+                  <span className="status-pill status-pill--info">Awaiting docs</span>
+                </div>
+                <p>{sub.cuisine || "Cuisine unknown"}</p>
+                <div className="list-meta">
+                  <span>{sub.location || "Location unavailable"}</span>
+                  {sub.contact && <span>{sub.contact}</span>}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }

@@ -12,6 +12,12 @@
   gap: 16px;
 }
 
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   font-size: 0.72rem;
@@ -107,6 +113,73 @@
   flex-wrap: wrap;
 }
 
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.inline-alert {
+  margin: 12px 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  font-weight: 500;
+}
+
+.inline-alert--success {
+  background: #ecfdf3;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.inline-alert--error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 18px 0 24px;
+}
+
+.field-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  flex: 1;
+}
+
+.field-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.field-input {
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  padding: 10px 14px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.field-input:focus {
+  border-color: #fb923c;
+  box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.2);
+  outline: none;
+}
+
+.loading-indicator,
+.loading-shell {
+  margin: 12px 0;
+  color: #475467;
+  font-weight: 500;
+}
+
 .btn {
   border-radius: 999px;
   border: 1px solid transparent;
@@ -179,6 +252,13 @@
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.04);
 }
 
+.list-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
 .list-card-content h3 {
   margin: 0;
   font-size: 1.1rem;
@@ -203,6 +283,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.list-note {
+  margin: 8px 0 0;
+  color: #0f172a;
+  font-size: 0.95rem;
 }
 
 .empty-state {
@@ -230,6 +316,32 @@
   color: #4338ca;
   font-weight: 500;
   font-size: 0.85rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.status-pill--pending {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.status-pill--success {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.status-pill--info {
+  background: #eef2ff;
+  color: #4338ca;
 }
 
 .error-text {

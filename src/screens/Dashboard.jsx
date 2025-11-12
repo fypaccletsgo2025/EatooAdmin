@@ -1,162 +1,212 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { db, DB_ID } from "../appwrite";
+import { fetchAdminData, ADMIN_API_READY } from "../lib/adminApi";
+
+const formatDate = (value) =>
+  value
+    ? new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    : "Unknown";
+
+const formatLocation = (doc) => {
+  const city = doc.city || doc.location;
+  const state = doc.state;
+  return [city, state].filter(Boolean).join(", ") || "Location unavailable";
+};
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ totalRestaurants: 0, pending: 0 });
+  const [stats, setStats] = useState({
+    totalRestaurants: 0,
+    pendingOwner: 0,
+    pendingUser: 0,
+    contacted: 0,
+  });
+  const [recentRestaurants, setRecentRestaurants] = useState([]);
+  const [ownerQueue, setOwnerQueue] = useState([]);
+  const [userQueue, setUserQueue] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-    async function fetchStats() {
-      try {
-        const [restaurants, pending] = await Promise.all([
-          db.listDocuments(DB_ID, "restaurants"),
-          db.listDocuments(DB_ID, "restaurant_request"),
-        ]);
-
-        if (!isMounted) return;
-
-        setStats({
-          totalRestaurants:
-            restaurants.total ?? restaurants.documents?.length ?? 0,
-          pending: pending.total ?? pending.documents?.length ?? 0,
-        });
-        setError(null);
-      } catch (err) {
-        console.error("Failed to load dashboard stats", err);
-        if (isMounted) {
-          setError(
-            "We could not load the latest stats. Please refresh to try again."
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
+    if (!ADMIN_API_READY) {
+      setError(
+        "Admin API base URL missing. Set VITE_ADMIN_API_BASE_URL in .env and restart the dev server."
+      );
+      setLoading(false);
+      return;
     }
 
-    fetchStats();
-
-    return () => {
-      isMounted = false;
-    };
+    try {
+      const data = await fetchAdminData("/dashboard-metrics");
+      const statsPayload = data.stats || {};
+      setStats({
+        totalRestaurants: statsPayload.totalRestaurants ?? 0,
+        pendingOwner: statsPayload.pendingOwner ?? 0,
+        pendingUser: statsPayload.pendingUser ?? 0,
+        contacted: statsPayload.contacted ?? 0,
+      });
+      setRecentRestaurants(data.recentRestaurants || []);
+      setOwnerQueue(data.ownerQueue || []);
+      setUserQueue(data.userQueue || []);
+    } catch (err) {
+      console.error("Failed to load dashboard", err);
+      setError(err.message || "Could not fetch metrics.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const approvals = Math.max(stats.totalRestaurants - stats.pending, 0);
-  const approvalRate = stats.totalRestaurants
-    ? Math.round((approvals / stats.totalRestaurants) * 100)
-    : 0;
-
-  const quickActions = [
-    { to: "/pending", label: "Review pending requests", variant: "primary" },
-    { to: "/submissions", label: "User submissions", variant: "secondary" },
-    {
-      to: "/manage-restaurants",
-      label: "Manage live restaurants",
-      variant: "ghost",
-    },
-  ];
-
-  const formatValue = (value, suffix = "") =>
-    loading ? "--" : `${value}${suffix}`;
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
 
   return (
-    <section className="page">
-      <header className="page-header">
+    <div className="page">
+      <div className="page-header">
         <div>
-          <p className="eyebrow">Overview</p>
-          <h1>Admin Dashboard</h1>
+          <p className="eyebrow">Command center</p>
+          <h1>Eatoo Admin Dashboard</h1>
           <p className="page-description">
-            Track the health of the marketplace and keep partner onboarding on
-            schedule.
+            Track the health of the onboarding pipeline, clear pending queues, and keep partner
+            restaurants up-to-date.
           </p>
         </div>
-      </header>
+        <div className="page-actions">
+          <button className="btn btn-ghost" onClick={loadDashboard} disabled={loading}>
+            {loading ? "Refreshing..." : "Refresh data"}
+          </button>
+          <Link className="btn btn-primary" to="/restaurant-requests">
+            Review owner queue
+          </Link>
+        </div>
+      </div>
 
-      {error && <p className="error-text">{error}</p>}
+      {error && <div className="inline-alert inline-alert--error">{error}</div>}
 
       <div className="stats-grid">
         <article className="stat-card">
-          <p className="stat-label">Total restaurants</p>
-          <p className="stat-value">{formatValue(stats.totalRestaurants)}</p>
+          <p className="stat-label">Live restaurants</p>
+          <p className="stat-value">{stats.totalRestaurants}</p>
+          <p className="stat-trend">Growing catalog</p>
         </article>
         <article className="stat-card">
-          <p className="stat-label">Pending approvals</p>
-          <p className="stat-value">{formatValue(stats.pending)}</p>
-          <p className="stat-trend">
-            {loading
-              ? "Loading..."
-              : stats.pending > 10
-              ? "Queue is getting long"
-              : "Queue is healthy"}
-          </p>
+          <p className="stat-label">Owner approvals pending</p>
+          <p className="stat-value">{stats.pendingOwner}</p>
+          <p className="stat-trend">Triage to keep SLAs</p>
         </article>
         <article className="stat-card">
-          <p className="stat-label">Approval rate</p>
-          <p className="stat-value">
-            {loading ? "--" : `${Math.min(100, Math.max(0, approvalRate))}%`}
-          </p>
-          <p className="stat-trend">vs pending backlog</p>
+          <p className="stat-label">User submissions pending</p>
+          <p className="stat-value">{stats.pendingUser}</p>
+          <p className="stat-trend">High-signal leads</p>
+        </article>
+        <article className="stat-card">
+          <p className="stat-label">Contacted leads</p>
+          <p className="stat-value">{stats.contacted}</p>
+          <p className="stat-trend">Ready for activation</p>
         </article>
       </div>
 
-      <div className="panel">
+      {loading && <p className="loading-indicator">Syncing latest numbers...</p>}
+
+      <div className="panel-grid">
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2 className="panel-title">Recent owner requests</h2>
+              <p className="panel-description">Clear this queue to move restaurants into the live catalog.</p>
+            </div>
+            <Link className="btn btn-secondary" to="/restaurant-requests">Go to requests</Link>
+          </div>
+          <div className="panel-body">
+            {ownerQueue.length === 0 && (
+              <div className="empty-state">
+                <strong>No owner requests pending</strong>
+                Great job! New submissions will appear here automatically.
+              </div>
+            )}
+            {ownerQueue.map((req) => (
+              <article key={req.$id} className="list-card">
+                <div className="list-card-content">
+                  <h3>{req.businessName}</h3>
+                  <p>{req.cuisine || "Cuisine unavailable"}</p>
+                  <div className="list-meta">
+                    <span>{formatLocation(req)}</span>
+                    <span>Submitted {formatDate(req.$createdAt)}</span>
+                    <span>Reg #{req.registrationNo}</span>
+                  </div>
+                </div>
+                <div className="list-card-actions">
+                  <a className="btn btn-ghost" href={`mailto:${req.email}`}>Email owner</a>
+                  <Link className="btn btn-primary" to="/restaurant-requests">Review</Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2 className="panel-title">Recent user submissions</h2>
+              <p className="panel-description">Tap into community picks. Contact and convert them inside submissions.</p>
+            </div>
+            <Link className="btn btn-secondary" to="/user-submissions">View submissions</Link>
+          </div>
+          <div className="panel-body">
+            {userQueue.length === 0 && (
+              <div className="empty-state">
+                <strong>No pending user submissions</strong>
+                Things look quiet. Ask the community for their favorite spots.
+              </div>
+            )}
+            {userQueue.map((sub) => (
+              <article key={sub.$id} className="list-card">
+                <div className="list-card-content">
+                  <h3>{sub.name}</h3>
+                  <p>{sub.cuisine || "Cuisine unspecified"}</p>
+                  <div className="list-meta">
+                    <span>{sub.location || "Location unknown"}</span>
+                    <span>Submitted {formatDate(sub.$createdAt)}</span>
+                  </div>
+                </div>
+                <div className="list-card-actions">
+                  {sub.contact && <a className="btn btn-ghost" href={`mailto:${sub.contact}`}>Contact</a>}
+                  <Link className="btn btn-primary" to="/user-submissions">Prioritize</Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="panel">
         <div className="panel-header">
           <div>
-            <h2 className="panel-title">Quick actions</h2>
-            <p className="panel-description">
-              Jump straight to the workflows you run most.
-            </p>
+            <h2 className="panel-title">Newly live restaurants</h2>
+            <p className="panel-description">Recently approved partners appear here for a quick quality check.</p>
           </div>
+          <Link className="btn btn-secondary" to="/manage-restaurants">Manage catalog</Link>
         </div>
-        <div className="panel-body quick-actions">
-          {quickActions.map(({ to, label, variant }) => (
-            <Link key={to} to={to} className={`btn btn-${variant}`}>
-              {label}
-            </Link>
+        <div className="panel-body">
+          {recentRestaurants.length === 0 && (
+            <div className="empty-state">
+              <strong>No restaurants yet</strong>
+              Approve requests to start building your supply.
+            </div>
+          )}
+          {recentRestaurants.map((restaurant) => (
+            <div key={restaurant.$id} className="data-list-row">
+              <div>
+                <p className="data-list-row-title">{restaurant.name}</p>
+                <p className="data-list-row-subtitle">{formatLocation(restaurant)} • {restaurant.cuisine || "Cuisine pending"}</p>
+              </div>
+              <p className="data-list-row-value">{formatDate(restaurant.$createdAt)}</p>
+            </div>
           ))}
         </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-header">
-          <div>
-            <h2 className="panel-title">Operational health</h2>
-            <p className="panel-description">
-              Keep the pending queue manageable to launch partners quickly.
-            </p>
-          </div>
-          {stats.pending > 0 && !loading && <span className="tag">Action needed</span>}
-        </div>
-        <div className="panel-body data-list">
-          <div className="data-list-row">
-            <div>
-              <p className="data-list-row-title">Pending requests</p>
-              <p className="data-list-row-subtitle">
-                Aim for fewer than 10 at any point in the day.
-              </p>
-            </div>
-            <span className="data-list-row-value">
-              {formatValue(stats.pending)}
-            </span>
-          </div>
-          <div className="data-list-row">
-            <div>
-              <p className="data-list-row-title">Live restaurants</p>
-              <p className="data-list-row-subtitle">
-                Total partners currently visible in the app.
-              </p>
-            </div>
-            <span className="data-list-row-value">
-              {formatValue(stats.totalRestaurants)}
-            </span>
-          </div>
-        </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }
