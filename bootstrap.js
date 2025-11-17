@@ -16,8 +16,10 @@ async function createCollections() {
 
   await db.createStringAttribute(DB_ID, "user_submissions", "name", 100, true);
   await db.createStringAttribute(DB_ID, "user_submissions", "location", 150, true);
-  await db.createStringAttribute(DB_ID, "user_submissions", "cuisine", 50, true);
-  await db.createStringAttribute(DB_ID, "user_submissions", "contact", 50, false);
+  await db.createStringAttribute(DB_ID, "user_submissions", "cuisines", 50, true);
+  await db.createStringAttribute(DB_ID, "user_submissions", "theme", 60, false);
+  await db.createStringAttribute(DB_ID, "user_submissions", "ambience", 60, false);
+  await db.createStringAttribute(DB_ID, "user_submissions", "map", 60, false);
   await db.createStringAttribute(DB_ID, "user_submissions", "note", 250, false);
   await db.createStringAttribute(DB_ID, "user_submissions", "status", 20, false, "pending");
   await db.createStringAttribute(DB_ID, "user_submissions", "type", 20, false, "user");
@@ -35,8 +37,11 @@ async function createCollections() {
   await db.createStringAttribute(DB_ID, "restaurant_requests", "city", 80, true);
   await db.createStringAttribute(DB_ID, "restaurant_requests", "state", 80, true);
   await db.createStringAttribute(DB_ID, "restaurant_requests", "postcode", 10, true);
-  await db.createStringAttribute(DB_ID, "restaurant_requests", "cuisine", 60, true);
+  await db.createStringAttribute(DB_ID, "restaurant_requests", "cuisines", 60, true);
   await db.createStringAttribute(DB_ID, "restaurant_requests", "website", 150, false);
+  await db.createStringAttribute(DB_ID, "restaurant_requests", "theme", 60, false);
+  await db.createStringAttribute(DB_ID, "restaurant_requests", "ambience", 60, false);
+  await db.createStringAttribute(DB_ID, "restaurant_requests", "map", 60, false);
   await db.createStringAttribute(DB_ID, "restaurant_requests", "note", 250, false);
   await db.createStringAttribute(DB_ID, "restaurant_requests", "status", 20, false, "pending");
   await db.createStringAttribute(DB_ID, "restaurant_requests", "type", 20, false, "owner");

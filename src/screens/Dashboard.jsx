@@ -13,6 +13,8 @@ const formatLocation = (doc) => {
   return [city, state].filter(Boolean).join(", ") || "Location unavailable";
 };
 
+const formatCuisines = (doc) => doc.cuisines || doc.cuisine || "";
+
 export default function Dashboard() {
   const [stats, setStats] = useState({
     totalRestaurants: 0,
@@ -130,7 +132,7 @@ export default function Dashboard() {
               <article key={req.$id} className="list-card">
                 <div className="list-card-content">
                   <h3>{req.businessName}</h3>
-                  <p>{req.cuisine || "Cuisine unavailable"}</p>
+                  <p>{formatCuisines(req) || "Cuisines unavailable"}</p>
                   <div className="list-meta">
                     <span>{formatLocation(req)}</span>
                     <span>Submitted {formatDate(req.$createdAt)}</span>
@@ -165,15 +167,16 @@ export default function Dashboard() {
               <article key={sub.$id} className="list-card">
                 <div className="list-card-content">
                   <h3>{sub.name}</h3>
-                  <p>{sub.cuisine || "Cuisine unspecified"}</p>
+                  <p>{formatCuisines(sub) || "Cuisines unspecified"}</p>
                   <div className="list-meta">
                     <span>{sub.location || "Location unknown"}</span>
                     <span>Submitted {formatDate(sub.$createdAt)}</span>
                   </div>
                 </div>
                 <div className="list-card-actions">
-                  {sub.contact && <a className="btn btn-ghost" href={`mailto:${sub.contact}`}>Contact</a>}
-                  <Link className="btn btn-primary" to="/user-submissions">Prioritize</Link>
+                  <Link className="btn btn-primary" to="/user-submissions">
+                    Prioritize
+                  </Link>
                 </div>
               </article>
             ))}
@@ -200,7 +203,9 @@ export default function Dashboard() {
             <div key={restaurant.$id} className="data-list-row">
               <div>
                 <p className="data-list-row-title">{restaurant.name}</p>
-                <p className="data-list-row-subtitle">{formatLocation(restaurant)} • {restaurant.cuisine || "Cuisine pending"}</p>
+                <p className="data-list-row-subtitle">
+                  {formatLocation(restaurant)} • {formatCuisines(restaurant) || "Cuisines pending"}
+                </p>
               </div>
               <p className="data-list-row-value">{formatDate(restaurant.$createdAt)}</p>
             </div>

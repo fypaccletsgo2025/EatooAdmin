@@ -19,31 +19,37 @@ async function seed() {
     const users = [
       {
         name: 'Cafe Aroma',
-        location: 'Bangsar',
-        cuisine: 'Coffee & Bakery',
-        contact: 'user1@example.com',
+        cuisines: 'Coffee, Bakery',
+        theme: 'Cozy cafe',
+        ambience: ['Warm', 'Relaxed'],
+        contact: '+61 3 9123 0001',
+        map: null,
         note: 'Cozy spot with amazing croissants',
         status: 'pending',
-        type: 'user'
+        type: 'user',
       },
       {
         name: 'Sushi Corner',
-        location: 'KLCC',
-        cuisine: 'Japanese',
-        contact: 'user2@example.com',
+        cuisines: 'Japanese',
+        theme: 'Minimalist sushi bar',
+        ambience: ['Quiet', 'Intimate'],
+        contact: '+61 3 9123 0002',
+        map: null,
         note: 'Small sushi stall near the fountain',
         status: 'pending',
-        type: 'user'
+        type: 'user',
       },
       {
         name: 'Burger Town',
-        location: 'Petaling Jaya',
-        cuisine: 'Fast Food',
-        contact: 'user3@example.com',
+        cuisines: 'American, Fast Food',
+        theme: 'Retro diner',
+        ambience: ['Casual', 'Lively'],
+        contact: '+61 3 9123 0003',
+        map: null,
         note: 'Affordable burgers, good for students',
         status: 'pending',
-        type: 'user'
-      }
+        type: 'user',
+      },
     ];
 
     for (const u of users) {
@@ -58,47 +64,54 @@ async function seed() {
         registrationNo: 'RG-1001',
         email: 'owner1@sunset.com',
         phone: '+60123456701',
-        address: '12 Ocean Drive',
-        city: 'Kuala Lumpur',
-        state: 'KL',
-        postcode: '50000',
-        cuisine: 'Western',
-        website: 'http://sunsetgrill.com',
+        address: '18 Jalan PJU 8/5A',
+        city: 'Petaling Jaya',
+        state: 'Selangor',
+        postcode: '47810',
+        cuisines: 'Western',
+        website: 'https://sunsetgrill.example.com',
+        theme: 'Seaside grill',
+        ambience: ['Open-air', 'Sunset views', 'Romantic'],
         note: 'Outdoor seating available',
         status: 'pending',
-        type: 'owner'
+        type: 'owner',
       },
       {
         businessName: 'Noodle Haven',
         registrationNo: 'RG-1002',
         email: 'owner2@noodle.com',
         phone: '+60123456702',
-        address: '45 Street Lane',
-        city: 'Penang',
+        address: '45 Lorong Love Lane',
+        city: 'George Town',
         state: 'Penang',
         postcode: '10200',
-        cuisine: 'Chinese',
+        cuisines: 'Chinese',
         website: '',
+        theme: 'Heritage noodle house',
+        ambience: ['Traditional', 'Bustling', 'Street-style'],
         note: 'Authentic handmade noodles',
         status: 'pending',
-        type: 'owner'
+        type: 'owner',
       },
       {
         businessName: 'Taco Fiesta',
         registrationNo: 'RG-1003',
         email: 'owner3@taco.com',
         phone: '+60123456703',
-        address: '78 Market Street',
-        city: 'Johor Bahru',
+        address: '78 Jalan Sutera',
+        city: 'Iskandar Puteri',
         state: 'Johor',
-        postcode: '80000',
-        cuisine: 'Mexican',
-        website: 'http://tacofiesta.com',
+        postcode: '79100',
+        cuisines: 'Mexican',
+        website: 'https://tacofiesta.example.com',
+        theme: 'Fiesta cantina',
+        ambience: ['Festive', 'Colorful', 'Live music'],
         note: 'Live music on weekends',
         status: 'pending',
-        type: 'owner'
-      }
+        type: 'owner',
+      },
     ];
+
 
     for (const o of owners) {
       await db.createDocument(DB_ID, COL_OWNER, ID.unique(), o);

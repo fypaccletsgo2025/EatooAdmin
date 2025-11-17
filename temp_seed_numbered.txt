@@ -1,0 +1,105 @@
+   1: // seed.js
+   2: import 'dotenv/config';
+   4: 
+   5: const client = new Client();
+   6: client.setEndpoint(process.env.VITE_APPWRITE_ENDPOINT);
+   7: client.setProject(process.env.VITE_APPWRITE_PROJECT_ID);
+   8: client.setKey(process.env.VITE_APPWRITE_API_KEY);
+   9: client.setSelfSigned(); // if using self-signed/local cert
+  10: 
+  11: const db = new Databases(client);
+  12: const DB_ID = process.env.VITE_APPWRITE_DB_ID;
+  13: const COL_USER = 'user_submissions';
+  14: const COL_OWNER = 'restaurant_requests';
+  15: 
+  18:     // --- USER SUBMISSIONS ---
+  19: const users = [
+  21:         name: 'Cafe Aroma',
+  22:         cuisines: 'Coffee & Bakery',
+  23:         theme: 'Cozy cafe',
+  24:         ambience: 'Warm & relaxed',
+  25:         map: '[144.9631, -37.8136]',
+  26:         note: 'Cozy spot with amazing croissants',
+  27:         status: 'pending',
+  28:         type: 'user'
+  31:     name: 'Sushi Corner',
+  32:         cuisines: 'Japanese',
+  33:         theme: 'Minimalist sushi bar',
+  34:         ambience: 'Quiet & intimate',
+  35:         map: '[144.9660, -37.8150]',
+  36:         note: 'Small sushi stall near the fountain',
+  37:         status: 'pending',
+  38:         type: 'user'
+  41:     name: 'Burger Town',
+  42:         cuisines: 'Fast Food',
+  43:         theme: 'Retro diner',
+  44:         ambience: 'Casual & lively',
+  45:         map: '[144.9655, -37.8165]',
+  46:         note: 'Affordable burgers, good for students',
+  47:         status: 'pending',
+  48:         type: 'user'
+  50: ];
+  51: 
+  53:       await db.createDocument(DB_ID, COL_USER, ID.unique(), u);
+  54:       console.log('User submission inserted:', u.name);
+  56: 
+  57:     // --- OWNER REQUESTS ---
+  58:     const owners = [
+  60:     businessName: "Sunset Grill",
+  61:     registrationNo: "RG-1001",
+  62:     email: "owner1@sunset.com",
+  63:     phone: "+60123456701",
+  64:     address: "12 Ocean Drive",
+  65:     city: "Kuala Lumpur",
+  66:     state: "KL",
+  67:     postcode: "50000",
+  68:     cuisines: "Western",
+  69:     website: "http://sunsetgrill.com",
+  70:     theme: "Seaside grill",
+  71:     ambience: ["Open-air", "Sunset view", "Romantic"],
+  72:     map: [101.6869, 3.1390],
+  73:     note: "Outdoor seating available",
+  74:     status: "pending",
+  75:     type: "owner",
+  78:     businessName: "Noodle Haven",
+  79:     registrationNo: "RG-1002",
+  80:     email: "owner2@noodle.com",
+  81:     phone: "+60123456702",
+  82:     address: "45 Street Lane",
+  83:     city: "Penang",
+  84:     state: "Penang",
+  85:     postcode: "10200",
+  86:     cuisines: "Chinese",
+  87:     website: "",
+  88:     theme: "Heritage noodle house",
+  89:     ambience: ["Traditional", "Bustling", "Street-style"],
+  90:     map: [100.3288, 5.4141],
+  91:     note: "Authentic handmade noodles",
+  92:     status: "pending",
+  93:     type: "owner",
+  96:     businessName: "Taco Fiesta",
+  97:     registrationNo: "RG-1003",
+  98:     email: "owner3@taco.com",
+  99:     phone: "+60123456703",
+ 100:     address: "78 Market Street",
+ 101:     city: "Johor Bahru",
+ 102:     state: "Johor",
+ 103:     postcode: "80000",
+ 104:     cuisines: "Mexican",
+ 105:     website: "http://tacofiesta.com",
+ 106:     theme: "Fiesta cantina",
+ 107:     ambience: ["Festive", "Colorful", "Loud music"],
+ 108:     map: [103.7414, 1.4927],
+ 109:     note: "Live music on weekends",
+ 110:     status: "pending",
+ 111:     type: "owner",
+ 113: ];
+ 114: 
+ 115: 
+ 117:       await db.createDocument(DB_ID, COL_OWNER, ID.unique(), o);
+ 118:       console.log('Owner request inserted:', o.businessName);
+ 120: 
+ 121:     console.log('🎉 Seeding complete.');
+ 123:     console.error('❌ Seeding error:', error);
+ 126: 
+ 127: seed();

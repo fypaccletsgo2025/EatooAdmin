@@ -1,34 +1,59 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { callAdminApi, fetchAdminData, ADMIN_API_READY } from "../lib/adminApi";
 
+const buildLocationString = (entry) =>
+  entry.location || [entry.address, entry.city, entry.state, entry.postcode].filter(Boolean).join(", ");
+
+const formatCuisines = (entry) => {
+  if (Array.isArray(entry.cuisines)) return entry.cuisines.join(", ");
+  return entry.cuisines || entry.cuisine || "";
+};
+const formatLocation = (entry) => buildLocationString(entry) || "Location unavailable";
+
+const formatMapValue = (entry) => {
+  if (typeof entry.map === "string" && entry.map.length > 0) {
+    return entry.map;
+  }
+  if (entry.map?.coordinates && Array.isArray(entry.map.coordinates)) {
+    const [lon, lat] = entry.map.coordinates;
+    if (lon != null && lat != null) return `[${lon}, ${lat}]`;
+  }
+  return "";
+};
+
 const EMPTY_FORM = {
   name: "",
-  businessName: "",
   registrationNo: "",
-  cuisine: "",
+  cuisines: "",
+  theme: "",
+  ambience: "",
+  location: "",
   city: "",
   state: "",
   postcode: "",
   address: "",
-  contact: "",
   phone: "",
   email: "",
   website: "",
+  map: "",
   note: "",
   ownerId: "",
 };
 
-const filterByQuery = (items, query, cuisine) => {
+const filterByQuery = (items, query, cuisineFilter) => {
   const term = query.trim().toLowerCase();
   return items.filter((item) => {
-    const matchesCuisine = cuisine === "all" || (item.cuisine || "").toLowerCase() === cuisine;
+    const matchesCuisine =
+      cuisineFilter === "all" || formatCuisines(item).toLowerCase() === cuisineFilter;
     if (!term) return matchesCuisine;
     const haystack = [
       item.name,
+      item.location,
       item.city,
       item.state,
-      item.cuisine,
-      item.contact,
+      formatCuisines(item),
+      item.theme,
+      item.ambience,
       item.email,
     ]
       .filter(Boolean)
@@ -76,10 +101,11 @@ export default function UserSubmissions() {
     loadSubs();
   }, [loadSubs]);
 
-  const cuisines = useMemo(() => {
+  const cuisineOptions = useMemo(() => {
     const set = new Set();
     [...pendingSubs, ...contactedSubs].forEach((sub) => {
-      if (sub.cuisine) set.add(sub.cuisine);
+      const value = formatCuisines(sub);
+      if (value) set.add(value);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [pendingSubs, contactedSubs]);
@@ -130,17 +156,19 @@ export default function UserSubmissions() {
     setSelectedSubmission(sub);
     setFormData({
       name: sub.name || "",
-      businessName: sub.businessName || sub.name || "",
       registrationNo: sub.registrationNo || "",
-      cuisine: sub.cuisine || "",
-      city: sub.city || sub.location || "",
+      cuisines: formatCuisines(sub),
+      theme: sub.theme || "",
+      ambience: sub.ambience || "",
+      location: "",
+      city: sub.city || "",
       state: sub.state || "",
       postcode: sub.postcode || "",
       address: sub.address || "",
-      contact: sub.contact || "",
       phone: sub.phone || "",
       email: sub.email || "",
       website: sub.website || "",
+      map: formatMapValue(sub),
       note: sub.note || "",
       ownerId: sub.ownerId || sub.$id || "",
     });
@@ -157,12 +185,20 @@ export default function UserSubmissions() {
     try {
       setProcessing({ id: selectedSubmission.$id, type: "approve" });
       setBanner(null);
+      const { note: _note, map: _map, ...approvalOverrides } = formData;
+      const mapValue = (formData.map || "").trim();
+      if (!mapValue) {
+        setError("Map coordinates are required.");
+        setProcessing(null);
+        return;
+      }
+      approvalOverrides.map = mapValue;
       const response = await fetch(`${base}/approve-user-submission`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           documentId: selectedSubmission.$id,
-          overrides: formData,
+          overrides: approvalOverrides,
         }),
       });
 
@@ -202,10 +238,9 @@ export default function UserSubmissions() {
                 {canContact ? "Pending outreach" : "Contacted"}
               </span>
             </div>
-            <p>{sub.cuisine || "Cuisine unknown"}</p>
+            <p>{formatCuisines(sub) || "Cuisines unknown"}</p>
             <div className="list-meta">
-              <span>{sub.city || "City unknown"}</span>
-              {sub.contact && <span>{sub.contact}</span>}
+              <span>{formatLocation(sub)}</span>
               <span>Added {new Date(sub.$createdAt).toLocaleDateString()}</span>
             </div>
             {sub.note && <p className="list-note">Note: {sub.note}</p>}
@@ -258,7 +293,7 @@ export default function UserSubmissions() {
               }}
             >
               <label>
-                <span>Restaurant name *</span>
+                <span>Business name *</span>
                 <input
                   type="text"
                   value={formData.name}
@@ -269,45 +304,73 @@ export default function UserSubmissions() {
               <div className="approve-panel-grid">
                 <label>
                   <span>Registration number</span>
-                  <input
-                    type="text"
-                    value={formData.registrationNo}
-                    onChange={(e) => setFormData({ ...formData, registrationNo: e.target.value })}
-                  />
+                <input
+                  type="text"
+                  value={formData.registrationNo}
+                  onChange={(e) =>
+                    setFormData({ ...formData, registrationNo: e.target.value })
+                  }
+                />
                 </label>
                 <label>
-                  <span>Cuisine</span>
-                  <input
-                    type="text"
-                    value={formData.cuisine}
-                    onChange={(e) => setFormData({ ...formData, cuisine: e.target.value })}
-                  />
+                  <span>Cuisines</span>
+                <input
+                  type="text"
+                  value={formData.cuisines}
+                  onChange={(e) => setFormData({ ...formData, cuisines: e.target.value })}
+                />
+                </label>
+                <label>
+                  <span>Theme</span>
+                <input
+                  type="text"
+                  value={formData.theme}
+                  onChange={(e) => setFormData({ ...formData, theme: e.target.value })}
+                />
+                </label>
+                <label>
+                  <span>Ambience</span>
+                <input
+                  type="text"
+                  value={formData.ambience}
+                  onChange={(e) => setFormData({ ...formData, ambience: e.target.value })}
+                />
                 </label>
               </div>
+              <label>
+                <span>Location shown to diners *</span>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder="e.g. Brisbane Southbank"
+                  required
+                />
+              </label>
               <div className="approve-panel-grid">
                 <label>
                   <span>City</span>
-                  <input
-                    type="text"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  />
+                <input
+                  type="text"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                />
                 </label>
                 <label>
                   <span>State</span>
-                  <input
-                    type="text"
-                    value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  />
+                <input
+                  type="text"
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                />
                 </label>
                 <label>
                   <span>Postcode</span>
-                  <input
-                    type="text"
-                    value={formData.postcode}
-                    onChange={(e) => setFormData({ ...formData, postcode: e.target.value })}
-                  />
+                <input
+                  type="text"
+                  value={formData.postcode}
+                  onChange={(e) => setFormData({ ...formData, postcode: e.target.value })}
+                />
                 </label>
               </div>
               <label>
@@ -320,44 +383,38 @@ export default function UserSubmissions() {
               </label>
               <div className="approve-panel-grid">
                 <label>
-                  <span>Primary contact</span>
-                  <input
-                    type="text"
-                    value={formData.contact}
-                    onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                  />
-                </label>
-                <label>
                   <span>Phone</span>
-                  <input
-                    type="text"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  />
+                <input
+                  type="text"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
                 </label>
                 <label>
                   <span>Email</span>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
                 </label>
                 <label>
                   <span>Website</span>
-                  <input
-                    type="url"
-                    value={formData.website}
-                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                  />
+                <input
+                  type="url"
+                  value={formData.website}
+                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                />
                 </label>
               </div>
               <label>
-                <span>Owner ID</span>
+                <span>Map coordinates *</span>
                 <input
                   type="text"
-                  value={formData.ownerId}
-                  onChange={(e) => setFormData({ ...formData, ownerId: e.target.value })}
+                  value={formData.map}
+                  onChange={(e) => setFormData({ ...formData, map: e.target.value })}
+                  placeholder="[longitude, latitude]"
+                  required
                 />
               </label>
               <label>
@@ -366,6 +423,14 @@ export default function UserSubmissions() {
                   rows={3}
                   value={formData.note}
                   onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                />
+              </label>
+              <label>
+                <span>Owner ID</span>
+                <input
+                  type="text"
+                  value={formData.ownerId}
+                  onChange={(e) => setFormData({ ...formData, ownerId: e.target.value })}
                 />
               </label>
               <div className="modal-actions">
@@ -410,22 +475,22 @@ export default function UserSubmissions() {
             <input
               type="search"
               className="field-input"
-              placeholder="Name, cuisine, city, contact"
+              placeholder="Name, cuisines, city, email"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
           <label className="field-control">
-            <span className="field-label">Cuisine</span>
+            <span className="field-label">Cuisines</span>
             <select
               className="field-input"
               value={cuisineFilter}
               onChange={(e) => setCuisineFilter(e.target.value)}
             >
               <option value="all">All cuisines</option>
-              {cuisines.map((cuisine) => (
-                <option key={cuisine} value={cuisine.toLowerCase()}>
-                  {cuisine}
+              {cuisineOptions.map((option) => (
+                <option key={option} value={option.toLowerCase()}>
+                  {option}
                 </option>
               ))}
             </select>

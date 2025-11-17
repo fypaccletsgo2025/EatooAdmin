@@ -1,16 +1,33 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { callAdminApi, fetchAdminData, ADMIN_API_READY } from "../lib/adminApi";
 
-const formatLocation = (req) => {
-  const parts = [req.city, req.state];
-  return parts.filter(Boolean).join(", ") || "Location unavailable";
+const buildLocationString = (req) =>
+  req.location || [req.address, req.city, req.state, req.postcode].filter(Boolean).join(", ");
+
+const formatCuisines = (req) => {
+  if (Array.isArray(req.cuisines)) return req.cuisines.join(", ");
+  return req.cuisines || req.cuisine || "";
+};
+const formatLocation = (req) => buildLocationString(req) || "Location unavailable";
+
+const formatMapValue = (entry) => {
+  if (typeof entry.map === "string" && entry.map.length > 0) {
+    return entry.map;
+  }
+  if (entry.map?.coordinates && Array.isArray(entry.map.coordinates)) {
+    const [lon, lat] = entry.map.coordinates;
+    if (lon != null && lat != null) return `[${lon}, ${lat}]`;
+  }
+  return "";
 };
 
 const EMPTY_FORM = {
   name: "",
-  businessName: "",
   registrationNo: "",
-  cuisine: "",
+  cuisines: "",
+  theme: "",
+  ambience: "",
+  location: "",
   city: "",
   state: "",
   postcode: "",
@@ -18,6 +35,7 @@ const EMPTY_FORM = {
   phone: "",
   email: "",
   website: "",
+  map: "",
   note: "",
   ownerId: "",
 };
@@ -61,7 +79,9 @@ export default function RestaurantRequests() {
 
   const cities = useMemo(() => {
     const set = new Set();
-    requests.forEach((req) => { if (req.city) set.add(req.city); });
+    requests.forEach((req) => {
+      if (req.city) set.add(req.city);
+    });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [requests]);
 
@@ -72,11 +92,17 @@ export default function RestaurantRequests() {
       if (!text) return matchesCity;
       const haystack = [
         req.businessName,
+        req.location,
         req.city,
         req.state,
-        req.cuisine,
-        req.registrationNo
-      ].filter(Boolean).join(" ").toLowerCase();
+        formatCuisines(req),
+        req.theme,
+        req.ambience,
+        req.registrationNo,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
       return matchesCity && haystack.includes(text);
     });
   }, [requests, search, cityFilter]);
@@ -134,12 +160,21 @@ export default function RestaurantRequests() {
       setBanner(null);
       setError(null);
 
+      const { note: _note, map: _map, ...approvalOverrides } = formData;
+      const mapValue = (formData.map || "").trim();
+      if (!mapValue) {
+        setError("Map coordinates are required.");
+        setProcessing(null);
+        return;
+      }
+      approvalOverrides.map = mapValue;
+
       const response = await fetch(`${base}/approve-restaurant-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           documentId: selectedRequest.$id,
-          overrides: formData,
+          overrides: approvalOverrides,
         }),
       });
 
@@ -186,7 +221,7 @@ export default function RestaurantRequests() {
             <input
               type="search"
               className="field-input"
-              placeholder="Name, cuisine, registration no."
+              placeholder="Name, cuisines, registration no."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -239,10 +274,10 @@ export default function RestaurantRequests() {
                       <h3>{req.businessName}</h3>
                       <span className="status-pill status-pill--pending">Pending review</span>
                     </div>
-                    <p>{req.cuisine || "Cuisine unavailable"}</p>
+                    <p>{formatCuisines(req) || "Cuisines unavailable"}</p>
                     <div className="list-meta">
                       <span>{formatLocation(req)}</span>
-                      <span>Contact {req.phone}</span>
+                      <span>{req.phone ? `Phone ${req.phone}` : "No phone provided"}</span>
                       <span>{req.email}</span>
                     </div>
                     {req.note && <p className="list-note">Note: {req.note}</p>}
@@ -263,16 +298,19 @@ export default function RestaurantRequests() {
                         setSelectedRequest(req);
                         setFormData({
                           name: req.businessName || req.name || "",
-                          businessName: req.businessName || "",
                           registrationNo: req.registrationNo || "",
-                          cuisine: req.cuisine || "",
-                          city: req.city || req.location || "",
+                          cuisines: formatCuisines(req),
+                          theme: req.theme || "",
+                          ambience: req.ambience || "",
+                          location: "",
+                          city: req.city || "",
                           state: req.state || "",
                           postcode: req.postcode || "",
                           address: req.address || "",
                           phone: req.phone || "",
                           email: req.email || "",
                           website: req.website || "",
+                          map: formatMapValue(req),
                           note: req.note || "",
                           ownerId: req.ownerId || "",
                         });
@@ -307,10 +345,11 @@ export default function RestaurantRequests() {
                       }}
                     >
                       <label>
-                        <span>Restaurant name *</span>
+                        <span>Business name *</span>
                         <input
                           type="text"
                           value={formData.name}
+                          readOnly
                           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                           required
                         />
@@ -321,24 +360,59 @@ export default function RestaurantRequests() {
                           <input
                             type="text"
                             value={formData.registrationNo}
-                            onChange={(e) => setFormData({ ...formData, registrationNo: e.target.value })}
+                            readOnly
+                            onChange={(e) =>
+                              setFormData({ ...formData, registrationNo: e.target.value })
+                            }
                           />
                         </label>
                         <label>
-                          <span>Cuisine</span>
+                          <span>Cuisines</span>
                           <input
                             type="text"
-                            value={formData.cuisine}
-                            onChange={(e) => setFormData({ ...formData, cuisine: e.target.value })}
+                            value={formData.cuisines}
+                            readOnly
+                            onChange={(e) =>
+                              setFormData({ ...formData, cuisines: e.target.value })
+                            }
+                          />
+                        </label>
+                        <label>
+                          <span>Theme</span>
+                          <input
+                            type="text"
+                            value={formData.theme}
+                            readOnly
+                            onChange={(e) => setFormData({ ...formData, theme: e.target.value })}
+                          />
+                        </label>
+                        <label>
+                          <span>Ambience</span>
+                          <input
+                            type="text"
+                            value={formData.ambience}
+                            readOnly
+                            onChange={(e) => setFormData({ ...formData, ambience: e.target.value })}
                           />
                         </label>
                       </div>
+                      <label>
+                        <span>Location shown to diners *</span>
+                        <input
+                          type="text"
+                          value={formData.location}
+                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                          placeholder="e.g. Melbourne CBD"
+                          required
+                        />
+                      </label>
                       <div className="approve-panel-grid">
                         <label>
                           <span>City</span>
                           <input
                             type="text"
                             value={formData.city}
+                            readOnly
                             onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                           />
                         </label>
@@ -347,6 +421,7 @@ export default function RestaurantRequests() {
                           <input
                             type="text"
                             value={formData.state}
+                            readOnly
                             onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                           />
                         </label>
@@ -355,6 +430,7 @@ export default function RestaurantRequests() {
                           <input
                             type="text"
                             value={formData.postcode}
+                            readOnly
                             onChange={(e) => setFormData({ ...formData, postcode: e.target.value })}
                           />
                         </label>
@@ -364,6 +440,7 @@ export default function RestaurantRequests() {
                         <input
                           type="text"
                           value={formData.address}
+                          readOnly
                           onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                         />
                       </label>
@@ -373,6 +450,7 @@ export default function RestaurantRequests() {
                           <input
                             type="text"
                             value={formData.phone}
+                            readOnly
                             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                           />
                         </label>
@@ -381,6 +459,7 @@ export default function RestaurantRequests() {
                           <input
                             type="email"
                             value={formData.email}
+                            readOnly
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                           />
                         </label>
@@ -389,6 +468,7 @@ export default function RestaurantRequests() {
                           <input
                             type="url"
                             value={formData.website}
+                            readOnly
                             onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                           />
                         </label>
@@ -398,7 +478,18 @@ export default function RestaurantRequests() {
                         <input
                           type="text"
                           value={formData.ownerId}
+                          readOnly
                           onChange={(e) => setFormData({ ...formData, ownerId: e.target.value })}
+                        />
+                      </label>
+                      <label>
+                        <span>Map coordinates *</span>
+                        <input
+                          type="text"
+                          value={formData.map}
+                          onChange={(e) => setFormData({ ...formData, map: e.target.value })}
+                          placeholder="[longitude, latitude]"
+                          required
                         />
                       </label>
                       <label>
@@ -406,6 +497,7 @@ export default function RestaurantRequests() {
                         <textarea
                           rows={3}
                           value={formData.note}
+                          readOnly
                           onChange={(e) => setFormData({ ...formData, note: e.target.value })}
                         />
                       </label>

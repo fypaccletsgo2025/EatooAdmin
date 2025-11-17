@@ -34,21 +34,24 @@ async function addAttributeIfMissing(collectionId, attrConfig) {
 
 async function main() {
   const updates = [
-    {
-      collection: "user_submissions",
-      attrs: [
-        { key: "status", size: 50, required: false },
-        { key: "type", size: 50, required: false },
-      ],
-    },
-    {
-      collection: "restaurant_requests",
-      attrs: [
-        { key: "status", size: 50, required: false },
-        { key: "type", size: 50, required: false },
-      ],
-    },
-  ];
+  {
+    collection: "user_submissions",
+    attrs: [
+      { key: "status", size: 50, required: false },
+      { key: "type", size: 50, required: false },
+      { key: "location", size: 100, required: false }, // 👈 NEW
+    ],
+  },
+  {
+    collection: "restaurant_requests",
+    attrs: [
+      { key: "status", size: 50, required: false },
+      { key: "type", size: 50, required: false },
+      { key: "location", size: 100, required: false }, // 👈 NEW
+    ],
+  },
+];
+
 
   for (const { collection, attrs } of updates) {
     console.log(`\n🔧 Updating collection: ${collection}`);
