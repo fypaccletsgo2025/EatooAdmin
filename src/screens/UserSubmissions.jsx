@@ -170,7 +170,7 @@ export default function UserSubmissions() {
       website: sub.website || "",
       map: formatMapValue(sub),
       note: sub.note || "",
-      ownerId: sub.ownerId || sub.$id || "",
+      ownerId: "",
     });
   };
 

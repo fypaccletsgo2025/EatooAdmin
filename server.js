@@ -148,9 +148,11 @@ const moveDocumentToRestaurants = async ({
   let createdRestaurant = null;
 
   try {
+    // Mark the source record as approved first so Appwrite triggers can react to the status change.
+    await db.updateDocument(DB_ID, sourceCollection, documentId, { status: "approved" });
+
     console.log("Creating restaurant document", documentId, payload.map);
     createdRestaurant = await db.createDocument(DB_ID, COL_RESTAURANTS, documentId, payload);
-    await db.deleteDocument(DB_ID, sourceCollection, documentId);
     if (notification) {
       await logNotification({
         restaurantId: documentId,
@@ -283,7 +285,7 @@ app.post("/approve-user-submission", async (req, res) => {
       throw new Error("Missing documentId.");
     }
 
-    let normalizedOverrides = { ...overrides };
+    let normalizedOverrides = { ...overrides, ownerId: overrides.ownerId ?? "" };
     const coords = overrides?.map;
     if (Array.isArray(coords) && coords.length === 2) {
       normalizedOverrides.map = {
